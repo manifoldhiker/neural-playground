@@ -149,7 +149,7 @@ def tree2tokens(tree):
 
     input_tokens = [*edge_tokens, '|', goal, ':', root]
     
-    target_path = from_root_to_node(tree, goal)
+    target_path = from_root_to_node(tree, goal)[1:]
     path_tokens = [f'→{node_val}' for node_val in target_path]
     
     return input_tokens, path_tokens

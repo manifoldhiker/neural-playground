@@ -170,9 +170,33 @@ def input_tokens_to_tree(input_tokens):
     return tree
 
 
+def parse_input_idx(input_idx, tokenizer):
+    input_tokens = tokenizer.detokenize(input_idx)
+
+    input_tokens = [t for t in input_tokens if t != PAD_TOKEN]
+    idx = input_tokens.index('|')
+    edge_tokens = ''.join(input_tokens[:idx])
+    edges = [edge.split('→') for edge in edge_tokens.split(',')]
+    tree = edges_to_tree(edges)
+
+    output_tokens = input_tokens[idx+1:]
+
+    goal_node = output_tokens[0]
+    root_node = output_tokens[2]
+    path = output_tokens[3:]
+
+    return {
+        'tree': tree,
+        'goal': goal_node,
+        'root': root_node,
+        'path': path,
+    }
+
+
+PAD_TOKEN = '<PAD>'
 
 class MyTreeTokenizer:
-    special_tokens = ['<PAD>', ',', '|', ':']
+    special_tokens = [PAD_TOKEN, ',', '|', ':']
 
 
     def __init__(self, n_nodes):
@@ -190,7 +214,7 @@ class MyTreeTokenizer:
         return [self.token2idx[str(t)] for t in s]
 
     def detokenize(self, idx):
-        return [self.idx2token[i] for i in idx]
+        return [self.idx2token[int(i)] for i in idx]
 
 
     def __call__(self, s): return self.tokenize(s)
@@ -214,8 +238,8 @@ class TreeDataset(IterableDataset):
             # pad_mask = torch.zeros(self.tokenizer.MAX_SEQ_LEN)
             # pad_mask[:len(input_idx)] = 1
             
-            task_mask = torch.zeros(self.tokenizer.MAX_SEQ_LEN)
-            task_mask[:len(prompt_idx)] = 1
+            task_mask = torch.zeros(self.tokenizer.MAX_SEQ_LEN, dtype=torch.bool)
+            task_mask[len(prompt_idx):len(input_tokens)] = True
             
             yield {
                 'input_idx': input_idx,

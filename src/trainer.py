@@ -1,5 +1,6 @@
 import torch
 import numpy as np
+import pandas as pd
 import torch.nn.functional as F
 from torch.utils.data import DataLoader
 
@@ -7,6 +8,25 @@ from transformer_lens import HookedTransformer, HookedTransformerConfig
 
 from .tree import list2tree
 from .tree_dataset import TreeDataset, parse_input_idx, input_tokens_to_tree, tree_to_edges
+
+
+def accuracy_by_depth(outputs, input_idx, out_mask):
+    metrics = []
+    
+    for pred_row, gt_row, row_mask in zip(outputs.argmax(dim=-1), input_idx[:, 1:], out_mask):
+        is_path_correct = (pred_row[row_mask] == gt_row[row_mask]).all()
+        depth = row_mask.sum()
+    
+        metrics.append({'is_path_correct': is_path_correct.item(), 'depth': depth.item()})
+    
+    
+    accuracy_by_goal_depth = pd.DataFrame(metrics).groupby('depth')['is_path_correct'].mean().to_dict()
+
+
+    accuracy_by_goal_depth = {f'acc/depth={d}':v for d,v in accuracy_by_goal_depth.items()}
+    
+    return accuracy_by_goal_depth
+
 
 class TreeTrainer:
     def __init__(self, conf):
@@ -44,8 +64,13 @@ class TreeTrainer:
         predictions = outputs[out_mask]
         
         loss = F.cross_entropy(predictions, targets)
-        accuracy = (predictions.argmax(dim=-1) == targets).float().mean()
-        return loss, accuracy
+
+        is_correct = (predictions.argmax(dim=-1) == targets)
+        accuracy_mean = is_correct.float().mean()
+        metrics = accuracy_by_depth(outputs, input_idx, out_mask)
+        metrics['accuracy/mean'] = accuracy_mean.item()
+
+        return loss, metrics
 
     def tok(self, *args, **kwargs): return self.dataset.tokenizer.tokenize(*args, **kwargs)
     def detok(self, *args, **kwargs): return self.dataset.tokenizer.detokenize(*args, **kwargs)

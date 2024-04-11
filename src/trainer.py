@@ -6,7 +6,7 @@ from torch.utils.data import DataLoader
 from transformer_lens import HookedTransformer, HookedTransformerConfig
 
 from .tree import list2tree
-from .tree_dataset import TreeDataset, parse_input_idx, input_tokens_to_tree, tree_to_edges, tree2tokens
+from .tree_dataset import TreeDataset, parse_input_idx, input_tokens_to_tree, tree_to_edges
 
 class TreeTrainer:
     def __init__(self, conf):

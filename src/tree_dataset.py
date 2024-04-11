@@ -4,9 +4,12 @@ from torch.utils.data import IterableDataset, DataLoader
 import torch
 
 from .tree import TreeNode
+from .utils import seed_all
 
 
-def random_binary_tree(n):
+def random_binary_tree(n, seed=None):
+    if seed is not None:
+        seed_all(seed)
     node_names = list(range(n))
     random.shuffle(node_names)
 
@@ -137,18 +140,19 @@ def from_root_to_node(tree, node_val):
 def edges_to_tokens(edges): return [token for from_node, to_node in edges for token in (str(from_node),f'→{to_node}', ',')][:-1]
 
 
-def tree2tokens(tree):
+def create_tree_path(tree, goal=None):
     edges = tree_to_edges(tree)
     random.shuffle(edges)
     
     edge_tokens = edges_to_tokens(edges)
     root = tree.val
-    leafs = get_leaf_vals(tree)
-
-    goal = random.choice(leafs)
+    
+    if goal is None:
+        leafs = get_leaf_vals(tree)
+        goal = random.choice(leafs)
 
     input_tokens = [*edge_tokens, '|', goal, ':', root]
-    
+
     target_path = from_root_to_node(tree, goal)[1:]
     path_tokens = [f'→{node_val}' for node_val in target_path]
     
@@ -157,9 +161,9 @@ def tree2tokens(tree):
 
 N_NODES_DEFAULT = 5
 
-def generate_datapoint(n_nodes=N_NODES_DEFAULT):
-    tree = random_binary_tree(n_nodes)
-    return tree2tokens(tree)
+def generate_datapoint(n_nodes=N_NODES_DEFAULT, seed=None):
+    tree = random_binary_tree(n_nodes, seed=seed)
+    return create_tree_path(tree)
 
 
 def input_tokens_to_tree(input_tokens):
@@ -220,29 +224,42 @@ class MyTreeTokenizer:
     def __call__(self, s): return self.tokenize(s)
 
 
+def create_input_idx(prompt_tokens, path_tokens, tokenizer):
+    prompt_idx = tokenizer(prompt_tokens)
+    path_idx = tokenizer(path_tokens)
+
+    input_tokens = prompt_idx + path_idx
+    pad_len = tokenizer.MAX_SEQ_LEN - len(input_tokens)
+
+    input_idx = torch.tensor(input_tokens + [0] * pad_len)
+    # pad_mask = torch.zeros(self.tokenizer.MAX_SEQ_LEN)
+    # pad_mask[:len(input_idx)] = 1
+    
+    task_mask = torch.zeros(tokenizer.MAX_SEQ_LEN, dtype=torch.bool)
+    task_mask[len(prompt_idx):len(input_tokens)] = True
+    
+    return {
+        'input_idx': input_idx,
+        'task_mask': task_mask,
+    }
+
+
 class TreeDataset(IterableDataset):
     def __init__(self, n_nodes=5):
         self.n_nodes = n_nodes
         self.tokenizer = MyTreeTokenizer(n_nodes)
-    
+
+
+
+
+
+    def generate_sample(self, n_nodes, seed=None):
+        prompt_tokens, path_tokens = generate_datapoint(n_nodes, seed=seed)
+        return create_input_idx(prompt_tokens, path_tokens, self.tokenizer)
+
+
     def __iter__(self):
         while True: 
-            prompt_tokens, path_tokens = generate_datapoint(self.n_nodes)
-            prompt_idx = self.tokenizer(prompt_tokens)
-            path_idx = self.tokenizer(path_tokens)
+            yield self.generate_sample(self.n_nodes)
 
-            input_tokens = prompt_idx + path_idx
-            pad_len = self.tokenizer.MAX_SEQ_LEN - len(input_tokens)
-    
-            input_idx = torch.tensor(input_tokens + [0] * pad_len)
-            # pad_mask = torch.zeros(self.tokenizer.MAX_SEQ_LEN)
-            # pad_mask[:len(input_idx)] = 1
-            
-            task_mask = torch.zeros(self.tokenizer.MAX_SEQ_LEN, dtype=torch.bool)
-            task_mask[len(prompt_idx):len(input_tokens)] = True
-            
-            yield {
-                'input_idx': input_idx,
-                'task_mask': task_mask,
-                # 'pad_mask': pad_mask,
-            }
+

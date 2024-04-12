@@ -263,3 +263,61 @@ class TreeDataset(IterableDataset):
             yield self.generate_sample(self.n_nodes)
 
 
+
+def random_tree_of_depth(depth, n_nodes, seed=None):
+    assert depth < n_nodes
+    assert depth > 0
+    assert n_nodes > 0
+
+    if seed is not None:
+        seed_all(seed)
+    node_names = list(range(n_nodes))
+    random.shuffle(node_names)
+    
+    nodes = [TreeNode(n) for n in node_names]
+    for i in range(depth):
+        nodes[i].left = nodes[i+1]
+    
+    
+    
+    orphans = nodes[depth+1:]
+    
+    # attach_points = list[node, is_right_vacant]
+    
+    # you can attach to the right
+    attach_points = [(n,1) for n in nodes[:depth]]
+    
+    for o in orphans:
+        random.shuffle(attach_points)
+        parent, is_right = attach_points.pop()
+    
+        if is_right:
+            parent.right = o
+        else:
+            parent.left = o
+    
+        attach_points.append((o,0))
+        attach_points.append((o,1))
+
+    tree = nodes[0]
+    goal = nodes[depth].val
+    return tree, goal
+
+
+class DeepTreeDataset(IterableDataset):
+    def __init__(self, n_nodes=16, possible_depths=(15,14,13)):
+        self.n_nodes = n_nodes
+        self.possible_depths = possible_depths
+
+        self.tokenizer = MyTreeTokenizer(n_nodes)
+
+    def generate_sample(self, n_nodes, possible_depths, seed=None):
+        depth = random.choice(possible_depths)
+        tree, goal = random_tree_of_depth(depth=depth, n_nodes=n_nodes, seed=seed)
+        prompt_tokens, path_tokens = create_tree_path(tree, goal)
+        return create_input_idx(prompt_tokens, path_tokens, self.tokenizer)
+
+
+    def __iter__(self):
+        while True: 
+            yield self.generate_sample(n_nodes=self.n_nodes, possible_depths=self.possible_depths)

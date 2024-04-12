@@ -7,7 +7,7 @@ from torch.utils.data import DataLoader
 from transformer_lens import HookedTransformer, HookedTransformerConfig
 
 from .tree import list2tree
-from .tree_dataset import TreeDataset, parse_input_idx, input_tokens_to_tree, tree_to_edges
+from .tree_dataset import TreeDataset, DeepTreeDataset, parse_input_idx, input_tokens_to_tree, tree_to_edges
 
 
 def accuracy_by_depth(outputs, input_idx, out_mask):
@@ -30,7 +30,12 @@ def accuracy_by_depth(outputs, input_idx, out_mask):
 
 class TreeTrainer:
     def __init__(self, conf):
-        dataset = TreeDataset(conf.n_nodes)
+        use_depth_adjusted_dataset = conf.get('use_depth_adjusted_dataset', None)
+        if use_depth_adjusted_dataset is not None:
+            print(f'{use_depth_adjusted_dataset=}')
+            dataset = DeepTreeDataset(**use_depth_adjusted_dataset)
+        else:
+            dataset = TreeDataset(conf.n_nodes)
         self.dataset = dataset
         self.dataloader = DataLoader(dataset, batch_size=conf['batch_size'])
 

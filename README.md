@@ -19,5 +19,5 @@ This work is mostly a replication of **Mechanistic Analysis of a Transformer Tra
 
 Open wandb 🪄🐝 [project](https://wandb.ai/kilianovski/reasoning-mech-interp) with experiment logs
 
-![Learning curves that suggest something interesting is going on](media/learning-curves.png)
+![Learning curves that suggest something interesting is going on](backward-chaining-interp/media/learning-curves.png)
 
